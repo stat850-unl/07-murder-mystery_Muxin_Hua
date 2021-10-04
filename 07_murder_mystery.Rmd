@@ -1,0 +1,105 @@
+---
+title: "Homework: Murder in SQL City"
+author: "Firstname Lastname"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F)
+options(digits = 3)
+
+library(tidyverse)
+```
+
+## Instructions
+Northwestern University's Knight lab created a SQL murder mystery to help users sharpen their database skills by solving the crime that happened at SQL city. There are tables with different pieces of information - social media checkins, people, drivers licenses, crime scene reports, police interviews, and more. 
+
+Pick R or SAS, and solve the murder mystery, showing **all of your work in this document**. 
+
+Your solution must be reproducible -- that is, you should use dplyr verbs, table joins, etc. to solve the mystery, rather than just looking through the tables yourselves.
+
+You may work in groups of 2-4 people on this assignment. Each person should turn in their own assignment, but should list their group members as authors.
+
+
+**For 5 bonus points, when you're finished in one language, write equivalent code in the other language to solve the problem.**
+
+When you are finished with the assignment: 
+
+1. Save the file as 07_Lastname_Firstname.Rmd and compile it
+2. Commit the Rmd file and corresponding html file to your homework git repo
+3. Push the commit to github
+4. Provide the name of the guilty party in the text input field on Canvas, and make sure all of your work is on GitHub to receive full credit.
+
+
+Your assignment must compile on a different computer as long as the sas path is set up correctly for that machine.
+
+I have exported the tables as CSVs, and you can access those using the code at these links: [R](https://github.com/srvanderplas/unl-stat850/blob/master/code/06_sql-murder-setup.R), [SAS](https://github.com/srvanderplas/unl-stat850/blob/master/code/06_sql-murder-setup.sas)
+
+The chunks below use the code to read in each of the 8 tables of data for this assignment.
+
+Hints:
+
+- You can use a lot of filter statements, but it will in many cases be easier to use joins. 
+- See if you can write code that doesn't require you to type out knowledge gained from a previous clue (e.g. pipe your results from one query into the next)
+
+
+***
+
+A crime has taken place and the detective needs your help. The detective gave you the crime scene report, but you somehow lost it. You vaguely remember that the crime was a murder that occurred sometime on January 15, 2018 and that it took place in SQL City. All the clues to this mystery are buried in a huge database, and you need to use R and SAS to navigate through this network of information. Your first step to solving the mystery is to retrieve the corresponding crime scene report from the police department's database. 
+
+This database schema may help you figure out how to navigate the database:
+
+![sql-murder-mystery database schema diagram](https://github.com/NUKnightLab/sql-mysteries/blob/master/schema.png?raw=true)
+
+## R
+```{r db-setup-r, eval = F}
+# you can do the assignment using the database, if you want, 
+# or you can use the script file to read in each table separately.
+library(RSQLite)
+library(DBI)
+
+# Your database connection code goes here. Store the connection as con 
+con <- dbConnect(RSQLite::SQLite(), "sql-murder-mystery.db")
+```
+
+```{r table-setup-r}
+if (!"purrr" %in% installed.packages()) {
+  install.packages("purrr")
+}
+# Load all tables from CSV
+table_names <- c("crime_scene_report", 
+                 "drivers_license", 
+                 "facebook_event_checkin",
+                 "get_fit_now_check_in", 
+                 "get_fit_now_member", 
+                 "income", 
+                 "interview",
+                 "person")
+
+url_base <- "https://raw.githubusercontent.com/srvanderplas/unl-stat850/master/data/sql-murder/"
+
+# For each table name, read the tables in and store them as the name of the table
+purrr::walk(table_names, function(x) {
+  assign(x, readr::read_csv(paste0(url_base, x, ".csv")), envir = .GlobalEnv)
+})
+```
+
+## SAS
+
+```{r load-sas-libraries, echo = F, message = F, warning = F}
+
+library(SASmarkdown)
+sas_enginesetup(sashtml=sashtml)
+
+sasexe <- "C:/Program Files/SASHome/SASFoundation/9.4/sas.exe"
+sasopts <- "-nosplash -ls 75"
+
+# Linux options (for grading, please leave this in!)
+sasexe <- "/usr/local/SASHome/SASFoundation/9.4/bin/sas_en"
+sasopts <- "-ls 75"
+```
+
+```{r, engine = "sashtml", engine.path = sasexe, engine.opts = sasopts, collectcode = T, error = T, include = T}
+/* This runs code stored in the import-code.sas file */
+%include 'import-code.sas';
+```
