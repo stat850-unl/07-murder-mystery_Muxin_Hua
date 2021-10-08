@@ -1,7 +1,10 @@
 ---
 title: "Homework: Murder in SQL City"
-author: "Firstname Lastname"
-output: html_document
+author: "Hua Muxin,  
+         Liang Zhenyu"
+output: 
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -84,22 +87,79 @@ purrr::walk(table_names, function(x) {
 })
 ```
 
+### change the column names for join convinience
+Some variables are recorded in different column names in different tables, we'll change them into identical names for convenience of performing `join` function.
+```{r}
+drivers_license <- rename(drivers_license, c('license_id'='id'))
+person <- rename(person, c('person_id'='id'))
+get_fit_now_member <- rename(get_fit_now_member, c('membership_id'='id'))
+facebook_event_checkin <- rename(facebook_event_checkin, c('fb_date'='date'))
+```
+
+
+### Get information about the murder
+The murder occurred sometime on January 15, 2018 and SQL City, so we extract such data first.
+```{r}
+target <- crime_scene_report %>% filter(city=='SQL City' & date=='20180115' & type=='murder')
+cat(target$description)
+```
+There is only one crime scene report matches the date, the crime type and the location.The description says there were 2 witnesses: one of them lives at the last house on **Northwestern Dr**, and the other witness named **Annabel** lives somewhere on **Franklin Avenue**. So we'll search further information about the witnesses.  
+
+### Trace the interview of two witnesses
+Witness **Annabel** has name and address, so we use `agrep` for fussy matching of both name and address, then I `inner_join` both results to get a unique record of this witness. Then we `inner_join` with *interview* table to see is there any other information can be provided by this witness.  
+The other witness has information of address, so we fussy matching the address, as he lives at the last house there, we arrange the address number in descending order and to find the largest number.  
+To further verify we got the correct information of this witness, we use the information we got from last step to `inner_join` with `facebook_event_checkin` table, and see if he and Annabel share any event record. Because if they witnessed the same murder, their traveling history must have something in common. Fortunately, event record verifies the identity of this witness.  
+```{r}
+#Extract information about witness 1
+wit_1 <-person[c(agrep('Annabel',person$name,ignore.case = T)),] %>%
+        select('name') %>%
+        inner_join(person[agrep('Franklin',person$address_street_name, ignore.case = T),], by='name') %>%
+        inner_join(interview, by='person_id')
+
+#Extract information about witness 2
+wit_2 <- person[c(agrep('Northwestern',person$address_street_name, ignore.case = T)),] %>%
+         arrange(desc(address_number))
+wit_2 <- inner_join(wit_2[1,],interview,by='person_id')
+
+#Verify the second witness is the one we're looking for, if their events matches, print “Verified, thet went to the same event”, if not matched, print "Not in the same event, further investigation needed"
+print(ifelse(inner_join(wit_2, facebook_event_checkin, by='person_id')$event_id == inner_join(wit_1, facebook_event_checkin, by='person_id')$event_id, 'Verified, thet went to the same event', 'Not in the same event, further investigation needed'))
+```
+Now we feel safe to see what are the transcript of the witnesses.
+```{r}
+cat("Witness Annabel:\n", wit_1$transcript,"\n")
+cat("Witness 2:\n", wit_2$transcript)
+```
+
+From the interview of the witnesses, we have following information:  
+1, killer was at the gym on **January 9th**, last week.  
+2, The murder commit gunshot is a man, who is a gold member of **get fit now gym**, his  **membership number** starts with **48Z** and his **car_plate** include **H42W**.  
+
+### Identify the record of suspect
+There are abundant information from witness 2, so we start finding the murderer with **member_id**, **membership status** using table *get_fit_now_member*. We verify the unique record by the **car_plate** mentioned.
+
+```{r}
+# Identify the suspect
+suspect <- get_fit_now_member[c(agrep('48Z', get_fit_now_member$membership_id, ignore.case = T)),] %>%
+           subset(membership_status=='gold') %>%
+           inner_join(person, by='person_id') %>%
+           inner_join(drivers_license, by='license_id') %>%
+           select('plate_number','name.x','membership_id')
+
+#verification, if the plate number verified the identified record, print "Verified", if not, print "Further investigation needed"
+print(ifelse(agrepl('H42W', suspect$plate_number, ignore.case = T), 'Verified', 'Further investigation needed'))
+```
+ 
+Though the plate number verified the record extracted, it's safer to double check the date from the first witness.
+```{r}
+#verification, if the date verified the identified record, print "Verified", if not, print "Further investigation needed"
+print(ifelse(agrepl('0109', as.character(get_fit_now_check_in[get_fit_now_check_in$membership_id==suspect$membership_id,]$check_in_date)), 'Verified', 'Further investigation needed'))
+
+```
+
+```{r}
+cat('So the name of the guilty party would be: \n', suspect$name.x)
+```
+
+
 ## SAS
-
-```{r load-sas-libraries, echo = F, message = F, warning = F}
-
-library(SASmarkdown)
-sas_enginesetup(sashtml=sashtml)
-
-sasexe <- "C:/Program Files/SASHome/SASFoundation/9.4/sas.exe"
-sasopts <- "-nosplash -ls 75"
-
-# Linux options (for grading, please leave this in!)
-sasexe <- "/usr/local/SASHome/SASFoundation/9.4/bin/sas_en"
-sasopts <- "-ls 75"
-```
-
-```{r, engine = "sashtml", engine.path = sasexe, engine.opts = sasopts, collectcode = T, error = T, include = T}
-/* This runs code stored in the import-code.sas file */
-%include 'import-code.sas';
-```
+Please Refer to the SAS file.
